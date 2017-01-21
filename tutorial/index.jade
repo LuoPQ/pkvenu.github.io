@@ -1,120 +1,201 @@
-.chapter(data-title='Server Notifications and Alerts')
-  .step(data-file='config/administrators.json')
+.chapter(data-title='Push Notification Subscription Basics')
+  .step(data-title='Welcome!')
     :markdown
-      ## What does this thing do?
+        ## What does this thing do?
 
-      This [Express.js](http://expressjs.com/) sample application
-      demonstrates how to send SMS alerts to a list of system
-      administrators if something goes wrong on your server. In this
-      tutorial, we'll show you the key bits of code to make this work.
-      Head to the [application's
-      README.md](https://github.com/TwilioDevEd/server-notifications-node)
-      to see how to run the application locally.
+        This is a demo application showing how to use [RingCentral Push Notifications](https://developers.ringcentral.com/api-docs/latest/index.html#!#RefNotifications.html) using the [official RingCentral JavaScript SDK](https://github.com/ringcentral/ringcentral-js). This application will GET all the Extensions (Enabled + User) in your RingCentral account (based on the environment, but defaults to Sandbox) and will add eventFilters in a single Subscription that will then receive Presence Events for these Extensions. The data from these presence events is then logged in the console of the application for you to review, and if you choose, filter and then execute external REST requests using the embedded HTTP server.
 
-    p
-      a(href="https://customers.twilio.com/178/emc/", target="_blank").
-        See how EMC uses Twilio SMS to send IT alerts to 68,000 employees.
+        p The tutorial's navigation controls are located above this text. Use <i class="fa fa-fw fa-play"></i> to move to the next step of the tutorial. Use <i class="fa fa-fw fa-play fa-rotate-180"></i> to move to the previous step of the tutorial (if there is one). Use <i class="fa fa-fw fa-list"></i> to see an overview of all the steps in the tutorial.
 
+        Developers are able to configure this application to operate with either your RingCentral Sandbox or Production applications in the .env file by setting the RC_ENV value to either sandbox or production.
+
+        Developers can also set this application to use any of the [RingCentral Subscription Notification Types](https://developers.ringcentral.com/api-docs/latest/index.html#!#EventTypes.html) (defaulby ts to all enabled) in your environment variables. Read the [API Reference for Notification Event Types](https://developers.ringcentral.com/api-docs/latest/index.html#!#EventTypes.html) to understand more about these options.
+
+        p Let's begin by addressing some prerequisites!
+
+  .step(data-title='Usage Prerequisites')
     :markdown
-      Let's get started!
+      ## Usage Prerequisites
 
-      ---
+      Please make sure you have access to the following required resources on-hand prior to running this source code locally or via deployment to Heroku
+
+      * Valid RingCentral Account - [Get your free RingCentral Developer Account](https://developers.ringcentral.com/free-tier-sign-up.html)
+      * Ability to login to the [RingCentral Developer Portal](https://developers.ringcentral.com)
+      * Have completed [Getting Started](https://developers.ringcentral.com/library/getting-started.html)
+      * Configured your RingCentral Sandbox User Extension with a direct number
+      * Verified your RingCentral Sandbox User Extension allows presence to be monitored, [learn how to configure presence monitoring](https://success.ringcentral.com/articles/en_US/RC_Knowledge_Article/How-to-choose-specific-user-extensions-to-monitor-for-Presence)
+      * If running on your local development machine, you have Node.js and Git installed
+      * If running using Heroku One-Button Deployment, a valid [Heroku](https://heroku.com) account
 
       **See Also:**
-      * [Getting started with Express.js](http://expressjs.com/starter/hello-world.html)
-      * [twilio-node library](http://twilio.github.io/twilio-node/)
+      * [Node.js](https://nodejs.org)
+      * [Git](https://git-scm.com/)
+      * [Heroku](https://heroku.com)
 
-  .step(data-file='config.js', data-highlight='23-45')
+  .step(data-file='tutorial/.env.tmpl')
     :markdown
-      ## Configure Twilio client
+      ## Environment Configuration
 
-      In order to send messages we'll need to create a [Twilio REST
-      client](http://twilio.github.io/twilio-node/#quickstart), which
-      requires reading our `TWILIO_ACCOUNT_SID`, `TWILIO_NUMBER`
-      `TWILIO_AUTH_TOKEN` from the enviroment. We also make the
-      variables available through the `config` module.
+      The first file we'll look at is `.env.tmpl`. This contains configuration data for this tutorial to operate either locally, on Heroku, or on your favorite PaaS. This file acts as a template for you and provides developers with all settings.
+      
+      If running locally or not on Heroku, Developers need to rename this file `mv .env.tmpl .env`. Open the file for editing, and fill in these tutorial runtime configuration values:
 
-      ---
+      * `PORT`: number - defaults to 3000
+      * `RC_ENV`: string - [sandbox, production] - tells the application which API endpoint to use - defaults to **sandbox**
+      * `RC_APP_KEY`: string - <your_ringcentral_application_key> - Available from within the RingCentral Developer Portal, also known as **client_id** in OAuth2 nomenclature
+      * `RC_APP_SECRET`: string - <your_ringcentral_application_secret> - Available from within the RingCentral Developer Portal, also known as **client_secret** in OAuth2 nomenclature
+      * `RC_USERNAME`: string - <your_ringcentral_username> - Either phone number or email (depending upon your account settings) and must be an administrative user-level account for either sandbox or production respectively
+      * `RC_PASSWORD`: string - <your_ringcentral_password> - The associated password for the `RC_USERNAME` provided above. Must be an administrative user-level account for either sandbox or production respectively
+      * `RC_EXTENSION`: string - <your_ringcentral_extension> - The extension number as a string, optional
+      * `RC_CACHE_PREFIX`: string - Randomized string for the RingCentral JavaScript SDK, only required if you modify the source otherwise leave empty
+      * `EXTENSIONS_PER_PAGE`: number - Quantity of extensions to fetch per page - defaults to **500**
+      * `SUBSCRIBE_TO_EXTENSION_EVENTS`: boolean - Flag to indicate if you want to subscribe to extension events - defaults to **true**
+      * `SUBSCRIBE_TO_PRESENCE_EVENTS`: boolean - Flag to indicate if you want to subscribe to extension's presence events - defaults to **true**
+      * `SUBSCRIBE_TO_MESSAGE_STORE_EVENTS`: boolean - Flag to indicate if you want to subscribe to extension's message store events - defaults to **true**
+      * `SUBSCRIBE_TO_PRESENCE_LINE_EVENTS`: boolean - Flag to indicate if you want to subscribe to extension's presence line events - defaults to **true**
+      * `SUBSCRIBE_TO_INSTANT_MESSAGE_EVENTS`: boolean - Flag to indicate if you want to subscribe to extension's instant message events - defaults to **true**
 
-      **See Also:**
-      * [twilio-node Quickstart](http://twilio.github.io/twilio-node/#quickstart)
-      * [Twilio REST Web Service Interface](https://www.twilio.com/docs/api/rest)
+      Now, let's take a look at the first file that contains the actual content of the tutorial, `tutorial/index.js`.
 
-  .step(data-file='config/administrators.json')
+  .step(data-file='tutorial/index.js', data-highlight='1-21')
     :markdown
-      ## List server admins
+      ## Dependencies and Mode
 
-      Here we create a list of administrators who should be notified if a
-      server error occurs.  The only essential piece of data we need is a
-      `phoneNumber` for each administrator.
+      First we enable JavaScript string mode so the interpreter starts in the appropriate mode respectively.
 
-  .step(data-file='webapp.js', data-highlight='60-62')
+      Next we setup this application's dependencies:
+
+      * `RC`: The RingCentral JavaScript SDK
+      * `http`: Node.js **http** module, used to create a web server
+      * `util`: Node.js **Util** module, used for unfolding JSON event data in the console logs
+
+      Once our dependencies are in place, we create the variable `rcServer` which  leverages the environment variables to define our API Base URI.
+
+      Then, we create an instance of the RingCentral JavaScript SDK which also leverages our environment variables to set user credentials.
+
+  .step(data-file='tutorial/index.js', data-highlight='21-26')
     :markdown
-      ## Handle all the exceptions in the application
+      ## Application Variables
 
-      We will implement error handling and message delivery as a piece
-      of [Express.js
-      middleware](http://expressjs.com/guide/using-middleware.html). We
-      will make all the Twilio API calls from there.
+      * `server`: The web server for this application
+      * `platform`: Cache the RingCentral Platform method to streamline our code later
+      * `subscription`: Creates a subscription, which is just a placeholder for the time being and will be populated later
 
-      ---
-
-      **See Also:**
-      * [Error handling middleware](http://expressjs.com/guide/using-middleware.html#middleware.error-handling)
-
-  .step(data-file='middleware/twilioNotifications.js')
+  .step(data-file='tutorial/index.js', data-highlight='28-46')
     :markdown
-      ## Trigger notifications for administrator list
+      ## Get a Token
 
-      In our Express middleware module, we read the admins from our JSON file
-      and send alert messages to each of them with the `sendSms` method in
-      `twilioClient`. We also call `next` with the error object, which will
-      allow other configured error handling middleware to execute.
+      Now that our application has all the necessary base parts to operate, let's define the `login` method which is used as a wrapper to the Promise-based [RingCentral JS SDK.platform.login method](https://github.com/ringcentral/ringcentral-js/blob/master/src/platform/Platform.js#L317) which is used to obtain an **access_token** we will use in subsequent API requests. This code is built to operate with a private, back-end application which uses [Password Flow](https://github.com/ringcentral/ringcentral-js#password-flow).
+      
+      Then we call the `login()` method to execute that code. If the SDK resolves that request, we initialize the application (more on this a little later in the tutorial).
 
-  .step(data-file='twilioClient.js')
+      The SDK caches the token for developers and manages refreshing the token if it is expired during a later request. This sounds great, but what happens if the Promise is rejected due to some error such as a bad request?
+
+  .step(data-file='tutorial/index.js', data-highlight='113-119')
     :markdown
-      ## Send a text message
+      ## Platform Events
 
-      There are the three parameters needed to [send an
-      SMS](http://twilio.github.io/twilio-node/#moreexamples)
-      using the [Twilio REST
-      API](https://www.twilio.com/docs/api/rest): `From`, `To`, and
-      `Body`. [US and Canadian phone
-      numbers](https://www.twilio.com/help/faq/sms/is-mms-supported-for-all-carriers-in-us-and-canada)
-      can also send an image with the message.
+      The RingCentral Platform provides developers with the following events related to getting, refreshing, and revoking tokens:
 
-      ---
+      * loginSuccess
+      * loginError
+      * logoutSuccess
+      * logoutError
+      * refreshSuccess
+      * refreshError
 
-      **See Also:**
-      * [REST API Docs for Message resource](https://www.twilio.com/docs/api/rest/message)
-      * [Your message logs in the account portal](https://www.twilio.com/user/account/log/messages)
+      The eventListeners and associated handlers we have defined really do not do much other than log the response or error, in a production environment you will need to address security concerns appropriately.
 
-  .step
+      **See Also**
+      * [RingCentral JS SDK - Login Flows](https://github.com/ringcentral/ringcentral-js#login)
+      * [RingCentral Platform Events](https://github.com/ringcentral/ringcentral-js#events)
+      * [Checking login state](https://github.com/ringcentral/ringcentral-js#checking-login-state)
+      * [Logout](https://github.com/ringcentral/ringcentral-js#logout)
+
+  .step(data-file='tutorial/index.js', data-highlight='52-74')
     :markdown
-      ## Where to next?
+      ## Get All User Enabled Extensions
 
-      That's it! We've just implemented an automated server notification system
-      that can send you server alerts if anything goes wrong. If you're a Node.js
-      developer working with Twilio, you might want to check out these other
-      tutorials.
+      When RingCentral has responded with a valid `access_token`, the core of the application starts when we call the `init()` method.
 
-      [**Two-Factor Authentication**](https://www.twilio.com/docs/howto/walkthrough/two-factor-authentication/node/express)
-
-      Increase the security of your login system by verifying a user's mobile
-      phone in addition to their password.
-
-      [**SMS and MMS marketing notifications**](https://www.twilio.com/docs/howto/walkthrough/marketing-notifications/node/express)
-
-      SMS and MMS messages are a personal way to engage with users, offering
-      a much higher open rate than e-mail and more impact than a tweet.
+      The first thing we do is define a closure for use with recursion to [GET Extension List]() for every extension in your RingCentral account where `type === 'User'` and `status === 'Enabled'`. Since the RingCentral JS SDK returns Promises we have thenables.
 
 
+  .step(data-file='tutorial/index.js', data-highlight='76-80')
+    :markdown
+      ## Handling Async with Thenables
 
-      ### Did this help?
+      Since the JS SDK returns Promises, we have thenables we can use to wait for the async code to resolve/reject accordingly.
 
-      Thanks for checking out this tutorial! If you have any feedback to share
-      with us, we'd love to hear it. Tweet [@twilio](http://twitter.com/twilio)
-      to let us know what you think.
+      The `init()` must also return a Promise or throw an error, so we begin our async chain by calling `getExtensionsPage()` (described in the previous step [Get All User Enabled Extensions]() ).
 
+      Then we pass the response data to the `createEventFilter`.
 
+  .step(data-file='tutorial/index.js', data-highlight='89-104')
+    :markdown
+      ## Create EventFilters
 
+      [RingCentral JS SDK Server-Side Subscriptions](https://github.com/ringcentral/ringcentral-js#server-side-subscriptions) require the `subscription` application variable placeholder we created earlier to be provided with an **array** of [EventFilters]().
+
+      The `createEventFilter` function requires a parameter be provided which is the full list of our account extensions.
+
+      First we setup a private variable `_eventFilters` which type **array** (the data type required by the JS SDK for this property's value when we will later register the `subscription`).
+      Then we iterate over each extension in the list, cache the extension for reference while building the `eventFilters` array elements.
+      Lastly we leverage our environment variables to generate the **string** for each [Event Type]() respectively and append it to the `_eventFilters` variable.
+      Finally, once all the eventFilters have been added, we return the `_eventFilters` back to the Promise chain, which passes the array of **eventFilters** as an argument to the `startSubscription` function.
+
+      It is a best practice to provide [Multiple event filters in a single Subscription](https://github.com/ringcentral/ringcentral-js#stale-subscriptions). You can see in this code that we leverage our environment variables to include 
+      
+      It is recommended that developers using the JS SDK read the full [Subscriptions lifecycle](https://github.com/ringcentral/ringcentral-js#subscriptions-lifecycle).
+
+      **See Also**
+      * [Removing Subscriptions from server](https://github.com/ringcentral/ringcentral-js#updating-subsctiptions)
+      * [Updating Subscriptions](https://github.com/ringcentral/ringcentral-js#updating-subsctiptions)
+      * [Subscription reset](https://github.com/ringcentral/ringcentral-js#subscription-reset)
+      * [Subscriptions lifecycle](https://github.com/ringcentral/ringcentral-js#subscriptions-lifecycle)
+      * [Stale Subscriptions](https://github.com/ringcentral/ringcentral-js#stale-subscriptions)
+
+  .step(data-file='tutorial/index.js', data-highlight='106-111')
+    :markdown
+      ## Registering the Subscription
+
+      Now that all the heavy lifting is completed, we call the `startSubscription` function and pass it the **eventFilters** we created in the previous step.
+      The value this function returns first calls the `subscription` method **setEventFilters**, and passes **eventFilters** through as an argument, and finally chains the JS SDK `subscription.register()` method which sends the eventFilters set on the subscription to the RingCentral API. The eventFilters are evaluated. If the request is in good form, the response we receive will contain your [Subscription Info Object](https://developers.ringcentral.com/api-docs/latest/index.html#!#SubscriptionInfo).
+
+      Please note: If an event filter is duplicated then only one instance of it will be kept for that subscription. Therefore, the client will always get only a single notification per subscription per event if the subscription conforms to the event.
+      Developers do not have to build their server-side subscription code as has been proposed here, you can also use the [Shorthand version of creating and registering subscriptions](https://github.com/ringcentral/ringcentral-js#shorthand).
+
+      The last thing this tutorial needs to do is be able to handle the inbound subscription events.
+
+      **See Also**
+      * [Subscription List](https://developers.ringcentral.com/api-docs/latest/index.html#!#RefSubscriptionList.html)
+      * [Subscription Item](https://developers.ringcentral.com/api-docs/latest/index.html#!#RefSubscription.html)
+      * [Renewing Subscriptions](https://developers.ringcentral.com/api-docs/latest/index.html#!#RefSubscriptionRenewal.html)
+      * [Notification Event Types](https://developers.ringcentral.com/api-docs/latest/index.html#!#EventTypes.html)
+
+  .step(data-file='tutorial/index.js', data-highlight='121-128')
+    :markdown
+      ## Subscription Events
+
+      As a convenience to developers using the JS SDK it exposes [Subscription Events](https://github.com/ringcentral/ringcentral-js/blob/master/src/subscription/Subscription.js#L24-L31). These Subscription Events are imilar **Platform Events** which can be used in eventListeners (discussed earlier in the tutorial):
+
+      * `notification`: Fires only after `subscribeSuccess` and before either `renewError` or `removeSuccess`. This is your actual Notification data as dictated by the **eventFilters** set on the `subscription`
+      * `removeSuccess`:  Fires only after a subscription has been removed
+      * `removeError`:  Fires if there is an error trying to remove a subscription
+      * `renewSuccess`:  Fires when a subscription has successfully been renewed - **NOTE: ** Subscriptions in the RingCentral SDKs renew automatically
+      * `renewError`:  Fires if there is an error attempting to renew a subscriptionq **NOTE: ** This is important to listen for in your applications, as this can result in lost data and creating a poor user experience with your application or integration
+      * `subscribeSuccess`: Fires if the `subscription.register()` method executes successfully. In production, your event consumers should be on the ready when you hear this event from RingCentral
+      * `subscribeError`:  Fires if there is an error attempting to execute `subscription.register()` method and provides additional information
+
+  .step(data-file='tutorial/index.js', data-highlight='130-134')
+    :markdown
+      ## Consuming Subscription Notifications
+
+      This is where the rubber meets the road for this tutorial, once you start the application and no errors have occurred, developers should see a console.log message **'SUBSCRIPTION CREATED SUCCESSFULLY'**. This message is only displayed when our `subscription.register()` method has successfully accepted our **eventFilters** and started the subscription.
+
+      The code shown here is the event consuming portion of the tutorial. To test that this is operating, you will need to take action using your RingCentral account with respect to the **eventFilters** you defined in the environment variables for the instance of this application. Let's try one that is pretty easy to test, we will test: SUBSCRIBE_TO_EXTENSION_EVENTS
+
+      1. Open your soft phone (making sure it is set to operate with the Sandbox API) desktop application 
+      2. Login as one of the extensions you know is a `type === User` and `status === Enabled`
+      3. You should see a console.log prefixed with **SUBSCRIPTION_NOTIFICATION.....** (that means the `subscription.on(subscription.events.notification)` eventListener was triggered and has called `handleSubscriptionNotification()` and supplied the **notification message** as the argument (which is what we should see in the logs).
+      4. Try toggling the various states of your user in the soft phone and watch the different types of events being generated and sent to your new app!

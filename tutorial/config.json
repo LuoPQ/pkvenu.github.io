@@ -1,6 +1,6 @@
 {
-    "title": "Server Notifications & Alerts",
-    "repo": "TwilioDevEd/server-notifications-node",
-    "description": "Never miss another server outage. Learn how to build a server notification system that will alert all administrators via SMS when a server outage occurs.",
-    "heroku": false
+    "title": "Push Notification Subscrption Basics",
+    "repo": "bdeanindy/ringcentral-subscription-basics",
+    "description": "Learn to use RingCentral event data with subscriptions instead of long-polling.",
+    "heroku": true
 }
